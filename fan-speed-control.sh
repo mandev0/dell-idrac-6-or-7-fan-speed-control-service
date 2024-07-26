@@ -18,7 +18,7 @@ IPMI_PW=<iDRAC_password>
 # Extract MAX temperature from first core in celsius using sensors command
 # outputs it as two digits, and then sets to 90% of value
 MIN_TEMP=35
-MAX_TEMP=$(sensors | grep Core | awk '/\+[0-9][0-9]\./{ print $6; exit }' | grep -o '[0-9][0-9]')
+MAX_TEMP=50 # Set your max temp
 MAX_TEMP=$(awk "BEGIN { print ${MAX_TEMP} * 0.9 }" )
 
 MIN_TEMP_PERCENT=15
@@ -38,7 +38,7 @@ while true
 do
     # Extract current temp from first core in celsius using sensors
     # command to get the temperature, and outputs it as two digits.
-    TEMPS=$(sensors | awk '/\+[0-9][0-9]\./{ print $3 }' | grep -o '[0-9][0-9]' | tr '\n' ' ')
+    TEMPS=$(ipmitool -I lanplus -H $IPMI_HOST -U $IPMI_USER -P $IPMI_PW -C 3 sdr type temperature |grep Ambient |grep degrees |grep -Po '\d{2}' | tail -1)
     TEMP=$(echo ${TEMPS} | awk '{s=0; for (i=1;i<=NF;i++)s+=$i; print s/NF;}')
     TEMP=$(echo "(${TEMP}+0.5)/1" | bc)
 
@@ -63,7 +63,7 @@ do
     fi
 
     # ignored if on auto fan control
-    ipmitool -I lanplus -H ${IPMI_HOST} -U ${IPMI_USER} -P ${IPMI_PW} raw 0x30 0x30 0x01 ${CONTROL}
+    ipmitool -I lanplus -H ${IPMI_HOST} -U ${IPMI_USER} -P ${IPMI_PW} -C 3 raw 0x30 0x30 0x01 ${CONTROL}
     if [[ $? == 0  && CONTROL != '0x01' ]]
     then
         # ignored if on auto fan control
@@ -83,7 +83,7 @@ do
                 TEMP_PERCENT_HEX=$(echo "obase=16 ; ${TEMP_PERCENT}" | bc)
                 echo "Temperature reading has changed: ${OLD_TEMP}°C / new: ${AVG_TEMP}°C; Adjusting fan speed to ${TEMP_PERCENT}%"
 
-                ipmitool -I lanplus -H ${IPMI_HOST} -U ${IPMI_USER} -P ${IPMI_PW} raw 0x30 0x30 0x02 0xff 0x${TEMP_PERCENT_HEX}
+                ipmitool -I lanplus -H ${IPMI_HOST} -U ${IPMI_USER} -P ${IPMI_PW} -C 3 raw 0x30 0x30 0x02 0xff 0x${TEMP_PERCENT_HEX}
                 OLD_TEMP=${AVG_TEMP}
 	        fi
         fi
